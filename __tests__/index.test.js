@@ -79,18 +79,49 @@ describe("given a component tree", () => {
     traverseComponents(graph, foo);
 
     //implement khan's algorithm
-    function khansAlgorithm(graph) {
+    function kahnsAlgorithm(graph) {
+      // TODO copy vertices so as not to mutate the original graph
+
       // list of nodes with no incoming edges
       const S = [...graph.vertices.keys()].filter(
         key => ![...graph.vertices.values()].flat().find(value => value === key)
       );
-      console.log([...graph.vertices.keys()]);
-      console.log([...graph.vertices.values()].flat());
-      console.log({ S });
-      console.log([...graph.vertices.values()].flat().find(1234));
+      const L = [];
+      while (S.length) {
+        const n = S.shift();
+        L.push(n);
+        // for each node m with an edge e from n to m do
+        const edges = [...graph.vertices.get(n)];
+        for (let i = 0; i < edges.length; i++) {
+          //         remove edge e from the graph
+          console.log(graph.vertices.get(n));
+          graph.vertices
+            .get(n)
+            .splice(graph.vertices.get(n).indexOf(edges[i]), 1);
+          console.log(graph.vertices.get(n));
+          //         if m has no other incoming edges then
+          //             insert m into S
+          if (
+            ![...graph.vertices.values()]
+              .flat()
+              .find(value => value === edges[i])
+          ) {
+            S.push(edges[i]);
+          }
+        }
+      }
+      // if graph has edges then
+      //     return error   (graph has at least one cycle)
+      if ([...graph.vertices.values()].flat().length > 0) {
+        throw new Error("Cyclical graph");
+      }
+      // else
+      // return L   (a topologically sorted order)
+      return L;
     }
 
-    khansAlgorithm(graph);
+    const sorted = kahnsAlgorithm(graph);
+    console.log({ sorted });
     //verify output
   });
 });
