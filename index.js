@@ -10,20 +10,19 @@ export class Component {
     this._dependencies = [];
   }
 
-  static addDependency(dep) {
+  addDependency(dep) {
     this._dependencies.push(dep);
   }
 
-  static get dependencies() {
-    return this._dependencies;
-  }
+  render() {}
+
+  // static get dependencies() {
+  //   return this._dependencies;
+  // }
 }
 
 export class ComponentGraph {
-  // defining vertex array and
-  // adjacent list
   constructor(rootComponent) {
-    // this.noOfVertices = noOfVertices;
     this.adjacencyList = new Map();
     this._build(rootComponent);
   }
@@ -32,19 +31,23 @@ export class ComponentGraph {
     return this.adjacencyList;
   }
 
-  _build(comp) {
-    this.addVertex(comp);
-    if (!comp.dependencies) {
+  _build(Comp) {
+    let instance = Comp;
+    if (Comp.constructor.name == "Function") {
+      instance = new Comp();
+    }
+    this.addVertex(instance);
+    if (!instance.dependencies) {
       return;
     }
-    let index = 0;
-    const len = comp.dependencies.length;
-    let dep;
-    for (index; index < len; index++) {
-      dep = comp.dependencies[index];
-      this.addVertex(dep);
-      this.addEdge(comp, dep);
-      this._build(dep);
+    const len = instance.dependencies.length;
+    for (let index = 0; index < len; index++) {
+      const Dep = instance.dependencies[index];
+      const depInstance = new Dep();
+      instance.addDependency(depInstance);
+      this.addVertex(depInstance);
+      this.addEdge(instance, depInstance);
+      this._build(depInstance);
     }
   }
 
@@ -108,8 +111,8 @@ export class ComponentGraph {
   evaluate() {
     // naive invocation of sorted functions in dependency order
     const sorted = this.sort().reverse();
-    for (let fn of sorted.values()) {
-      fn();
+    for (let comp of sorted.values()) {
+      comp.render();
     }
   }
 
@@ -133,4 +136,37 @@ export class ComponentGraph {
     }
   }
   // bfs(v)
+}
+
+export class ProxyApp {
+  constructor(rootNode, initialState = {}) {
+    this.graph = new ComponentGraph(rootNode);
+    this.sort();
+    this.evaluate();
+    const evaluate = this.evaluate.bind(this);
+    const handler = {
+      set(target, property, value, receiver) {
+        evaluate();
+        return Reflect.set(...arguments);
+      }
+    };
+    this._store = new Proxy(initialState, handler);
+  }
+
+  get store() {
+    return this._store;
+  }
+
+  sort() {
+    this.graph.sort();
+  }
+
+  evaluate() {
+    this.graph.evaluate();
+  }
+
+  render() {
+    // evaluate the dependency graph and render into the DOM
+    this.evaluate();
+  }
 }
