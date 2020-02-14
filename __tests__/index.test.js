@@ -1,4 +1,4 @@
-import { Component, ComponentGraph, ProxyApp, TheComponent } from "../index";
+import { Component, ComponentGraph, ProxyApp } from "../index";
 
 class Dep1 extends Component {
   constructor() {
@@ -6,6 +6,7 @@ class Dep1 extends Component {
     this.addDependency(new Dep2());
   }
 }
+
 class Dep2 extends Component {
   constructor() {
     super();
@@ -37,7 +38,7 @@ describe("reactive UIs by proxy", () => {
         expect(myComponent.render()).toBe(`<div>foobar</div>`);
       });
 
-      describe.only("and it has dependencies", () => {
+      describe("and it has dependencies", () => {
         it("returns those too", () => {
           class Dep extends Component {
             html() {
@@ -54,9 +55,87 @@ describe("reactive UIs by proxy", () => {
             }
           }
 
-          // TODO how to get the dependency instance(s) - maybe inject instances instead of constructors?
           const myComponent = new MyComponent();
           expect(myComponent.render()).toBe("<div><span>barbaz</span></div>");
+        });
+      });
+    });
+
+    describe("when it is given an observable model", () => {
+      describe("and a component changes the model", () => {
+        it("responds to the change outside the component", () => {
+          const initialState = {
+            foo: "bar",
+            bar: "baz"
+          };
+
+          const evaluate = jest.fn();
+          const store = new Proxy(initialState, {
+            set(target, property, value, receiver) {
+              evaluate({ property, value });
+              return true;
+            }
+          });
+
+          class HasStore extends Component {
+            constructor({ store }) {
+              super();
+              this._store = store;
+            }
+
+            onChange() {
+              this._store.foo = "bim";
+            }
+
+            html() {
+              return `hello ${this._store.name}`;
+            }
+          }
+
+          const hasStore = new HasStore({ store });
+          hasStore.onChange();
+          expect(evaluate).toHaveBeenCalledWith({
+            property: "foo",
+            value: "bim"
+          });
+        });
+      });
+
+      describe("and the model changes outside the component", () => {
+        it("reacts to the model change", () => {
+          const initialState = {
+            foo: "bar",
+            bar: "baz"
+          };
+
+          const store = new Proxy(initialState, {
+            set(target, property, value, receiver) {
+              // notify subsribers
+              evaluate({ property, value });
+              return true;
+            },
+            get(target, property, receiver) {
+              // how to know who's listening
+              return true;
+            }
+          });
+
+          class HasStore extends Component {
+            constructor({ store }) {
+              super();
+              this._store = store;
+            }
+            onChange() {
+              this._store.foo = "bim";
+            }
+            html() {
+              return `hello ${this._store.name}`;
+            }
+          }
+
+          // const hasStore = new HasStore({ store });
+          // hasStore.onChange();
+          // expect(evaluate).toHaveBeenCalledWith({
         });
       });
     });
@@ -106,16 +185,37 @@ describe("reactive UIs by proxy", () => {
     it("builds and sorts the graph when instantiated", () => {
       const sortSpy = jest.spyOn(ComponentGraph.prototype, "sort");
       const buildSpy = jest.spyOn(ComponentGraph.prototype, "_build");
-      const proxyApp = new ProxyApp(new Foo());
+      const proxyApp = new ProxyApp(Foo);
       expect(sortSpy).toHaveBeenCalled();
       expect(buildSpy).toHaveBeenCalled();
     });
+  });
 
+  describe("ProxyApp", () => {
     it("evaluates the graph when rendered", () => {
       const evaluateSpy = jest.spyOn(ComponentGraph.prototype, "evaluate");
-      const proxyApp = new ProxyApp(new Foo());
-      proxyApp.render(null);
+      const proxyApp = new ProxyApp(Foo);
+      proxyApp.render();
       expect(evaluateSpy).toHaveBeenCalled();
+    });
+
+    it("provides the model to the components", () => {
+      class HasStore extends Component {
+        constructor({ store }) {
+          super();
+          this._store = store;
+        }
+
+        html() {
+          return `hello ${this._store.name}`;
+        }
+      }
+
+      const initialState = { name: "world" };
+      const proxyApp = new ProxyApp(HasStore, initialState);
+      const result = proxyApp.evaluate();
+
+      expect(result).toBe("hello world");
     });
 
     it("evaluates the graph when the model changes", () => {
@@ -124,24 +224,11 @@ describe("reactive UIs by proxy", () => {
         bar: "baz"
       };
       const evaluateSpy = jest.spyOn(ProxyApp.prototype, "evaluate");
-      const proxyApp = new ProxyApp(new Foo(), initialState);
+      const proxyApp = new ProxyApp(Foo, initialState);
 
       proxyApp.store.foo = "bim";
       expect(evaluateSpy).toHaveBeenCalled();
       expect(proxyApp.store.foo).toBe("bim");
     });
-  });
-
-  describe.skip("component graph", () => {
-    it("builds the UI when rendered", () => {
-      // build a component tree with output
-      // instatiate the proxy app
-      // render
-      // assert the return string is correct
-    });
-
-    it.todo("updates the model from a component");
-
-    it.todo("only updates a component when subscribed state changes");
   });
 });

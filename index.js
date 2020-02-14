@@ -27,11 +27,16 @@ export class Component {
   render() {
     let html = this.html();
     html = this._renderDependencies(html);
+    this._rendered = html;
     return html;
   }
 
   get dependencies() {
     return this._dependencies;
+  }
+
+  get rendered() {
+    return this._rendered;
   }
 }
 
@@ -111,8 +116,12 @@ export class ComponentGraph {
     // naive invocation of sorted functions in dependency order
     const sorted = this.sort().reverse();
     for (let comp of sorted.values()) {
-      comp.render();
+      this._rendered = comp.render();
     }
+  }
+
+  get rendered() {
+    return this._rendered;
   }
 
   printGraph() {
@@ -138,10 +147,7 @@ export class ComponentGraph {
 }
 
 export class ProxyApp {
-  constructor(rootNode, initialState = {}) {
-    this.graph = new ComponentGraph(rootNode);
-    this.sort();
-    // this.evaluate();
+  constructor(RootNode, initialState = {}) {
     const evaluate = this.evaluate.bind(this);
     const handler = {
       set(target, property, value, receiver) {
@@ -150,6 +156,9 @@ export class ProxyApp {
       }
     };
     this._store = new Proxy(initialState, handler);
+    const rootNode = new RootNode({ store: this._store });
+    this.graph = new ComponentGraph(rootNode);
+    this.sort();
   }
 
   get store() {
@@ -162,10 +171,13 @@ export class ProxyApp {
 
   evaluate() {
     this.graph.evaluate();
+    return this.graph.rendered;
   }
 
-  render() {
+  render(element = { set innerHtml(html) {} }) {
     // evaluate the dependency graph and render into the DOM
-    this.evaluate();
+    const evaluatedGraph = this.evaluate();
+    element.innerHtml = evaluatedGraph;
+    return evaluatedGraph;
   }
 }
