@@ -3,20 +3,19 @@ import { Component, ComponentGraph, ProxyApp, TheComponent } from "../index";
 class Dep1 extends Component {
   constructor() {
     super();
-    this.dependencies = [Dep2];
+    this.addDependency(new Dep2());
   }
 }
 class Dep2 extends Component {
   constructor() {
     super();
-    this.dependencies = [];
   }
 }
 
 class Foo extends Component {
   constructor() {
     super();
-    this.dependencies = [Dep1];
+    this.addDependency(new Dep1());
   }
 }
 
@@ -25,16 +24,51 @@ describe("reactive UIs by proxy", () => {
     jest.restoreAllMocks();
   });
 
-  describe("given a component tree", () => {
-    it("sorts the graph in dependency order", () => {
-      const graph = new ComponentGraph(Foo);
-      const sorted = graph.sort();
+  describe("given a component", () => {
+    describe("when renderered", () => {
+      it("returns some content", () => {
+        class MyComponent extends Component {
+          html() {
+            return `<div>foobar</div>`;
+          }
+        }
 
-      //verify output - this works for a simple graph, but larger ones can have multiple correct sort orders
+        const myComponent = new MyComponent();
+        expect(myComponent.render()).toBe(`<div>foobar</div>`);
+      });
+
+      describe.only("and it has dependencies", () => {
+        it("returns those too", () => {
+          class Dep extends Component {
+            html() {
+              return "<span>barbaz</span>";
+            }
+          }
+          class MyComponent extends Component {
+            constructor() {
+              super();
+              this.addDependency(new Dep());
+            }
+            html() {
+              return `<div><Dep /></div>`;
+            }
+          }
+
+          // TODO how to get the dependency instance(s) - maybe inject instances instead of constructors?
+          const myComponent = new MyComponent();
+          expect(myComponent.render()).toBe("<div><span>barbaz</span></div>");
+        });
+      });
+    });
+  });
+
+  describe("given a component graph", () => {
+    it("sorts the graph in dependency order", () => {
+      const graph = new ComponentGraph(new Foo());
+      const sorted = graph.sort();
       expect(sorted[0] instanceof Foo).toBe(true);
       expect(sorted[1] instanceof Dep1).toBe(true);
       expect(sorted[2] instanceof Dep2).toBe(true);
-      // expect(sorted).toEqual([new Foo(), new Dep1(), new Dep2()]);
     });
 
     it("evaluates the graph in dependency order", () => {
@@ -42,17 +76,13 @@ describe("reactive UIs by proxy", () => {
       class Dep1 extends Component {
         constructor() {
           super();
-          this.dependencies = [Dep2];
+          this.addDependency(new Dep2());
         }
         render() {
           calls.push("dep1");
         }
       }
       class Dep2 extends Component {
-        constructor() {
-          super();
-          this.dependencies = [];
-        }
         render() {
           calls.push("dep2");
         }
@@ -61,13 +91,13 @@ describe("reactive UIs by proxy", () => {
       class Foo extends Component {
         constructor() {
           super();
-          this.dependencies = [Dep1];
+          this.addDependency(new Dep1());
         }
         render() {
           calls.push("foo");
         }
       }
-      const graph = new ComponentGraph(Foo);
+      const graph = new ComponentGraph(new Foo());
 
       graph.evaluate();
       expect(calls).toEqual(["dep2", "dep1", "foo"]);
@@ -76,28 +106,28 @@ describe("reactive UIs by proxy", () => {
     it("builds and sorts the graph when instantiated", () => {
       const sortSpy = jest.spyOn(ComponentGraph.prototype, "sort");
       const buildSpy = jest.spyOn(ComponentGraph.prototype, "_build");
-      const proxyApp = new ProxyApp(Foo);
+      const proxyApp = new ProxyApp(new Foo());
       expect(sortSpy).toHaveBeenCalled();
       expect(buildSpy).toHaveBeenCalled();
     });
 
     it("evaluates the graph when rendered", () => {
       const evaluateSpy = jest.spyOn(ComponentGraph.prototype, "evaluate");
-      const proxyApp = new ProxyApp(Foo);
+      const proxyApp = new ProxyApp(new Foo());
       proxyApp.render(null);
       expect(evaluateSpy).toHaveBeenCalled();
     });
 
-    it.only("evaluates the graph when the model changes", () => {
+    it("evaluates the graph when the model changes", () => {
       const initialState = {
         foo: "bar",
         bar: "baz"
       };
       const evaluateSpy = jest.spyOn(ProxyApp.prototype, "evaluate");
-      const proxyApp = new ProxyApp(Foo, initialState);
+      const proxyApp = new ProxyApp(new Foo(), initialState);
 
       proxyApp.store.foo = "bim";
-      expect(evaluateSpy).toHaveBeenCalledTimes(2);
+      expect(evaluateSpy).toHaveBeenCalled();
       expect(proxyApp.store.foo).toBe("bim");
     });
   });

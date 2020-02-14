@@ -1,10 +1,3 @@
-export function TheComponent(props) {
-  return `<div>
-            ${props.foo || ""}
-            ${props.children({ bar: props.bar })}
-          </div>`;
-}
-
 export class Component {
   constructor() {
     this._dependencies = [];
@@ -14,11 +7,32 @@ export class Component {
     this._dependencies.push(dep);
   }
 
-  render() {}
+  _renderDependencies(renderedHtml) {
+    function componentReducer(html, component) {
+      let componentPatten = `<${component.constructor.name}(.*?)(\/>|>.*<\/${
+        component.constructor.name
+      }>)`;
+      let re = new RegExp(componentPatten, "gi");
+      html = html.replace(re, component.html());
+      return html;
+    }
+    const finalHtml = this._dependencies.reduce(componentReducer, renderedHtml);
+    return finalHtml;
+  }
 
-  // static get dependencies() {
-  //   return this._dependencies;
-  // }
+  html() {
+    return "";
+  }
+
+  render() {
+    let html = this.html();
+    html = this._renderDependencies(html);
+    return html;
+  }
+
+  get dependencies() {
+    return this._dependencies;
+  }
 }
 
 export class ComponentGraph {
@@ -31,41 +45,26 @@ export class ComponentGraph {
     return this.adjacencyList;
   }
 
-  _build(Comp) {
-    let instance = Comp;
-    if (Comp.constructor.name == "Function") {
-      instance = new Comp();
-    }
-    this.addVertex(instance);
-    if (!instance.dependencies) {
+  _build(comp) {
+    this.addVertex(comp);
+    if (!comp.dependencies) {
       return;
     }
-    const len = instance.dependencies.length;
+    const len = comp.dependencies.length;
     for (let index = 0; index < len; index++) {
-      const Dep = instance.dependencies[index];
-      const depInstance = new Dep();
-      instance.addDependency(depInstance);
+      const depInstance = comp.dependencies[index];
       this.addVertex(depInstance);
-      this.addEdge(instance, depInstance);
+      this.addEdge(comp, depInstance);
       this._build(depInstance);
     }
   }
 
-  // functions to be implemented
   addVertex(v) {
-    // initialize the adjacent list with a
-    // null array
     this.adjacencyList.set(v, []);
   }
 
   addEdge(v, w) {
-    // get the list for vertex v and put the
-    // vertex w denoting edge between v and w
     this.adjacencyList.get(v).push(w);
-
-    // Since graph is undirected,
-    // add an edge from w to v also
-    // this.adjacencyList.get(w).push(v);
   }
 
   /**
@@ -142,7 +141,7 @@ export class ProxyApp {
   constructor(rootNode, initialState = {}) {
     this.graph = new ComponentGraph(rootNode);
     this.sort();
-    this.evaluate();
+    // this.evaluate();
     const evaluate = this.evaluate.bind(this);
     const handler = {
       set(target, property, value, receiver) {
