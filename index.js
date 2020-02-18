@@ -25,7 +25,7 @@ export class Component {
   }
 
   render() {
-    let html = this.html();
+    let html = this.html().replace(/(\\r\\n|\\n|\\r|\\")/gm, "");
     html = this._renderDependencies(html);
     this._rendered = html;
     return html;
@@ -143,16 +143,16 @@ export class ComponentGraph {
       console.log(i + " -> " + conc);
     }
   }
-  // bfs(v)
 }
 
 export class ProxyApp {
   constructor(RootNode, initialState = {}) {
-    const evaluate = this.evaluate.bind(this);
+    const render = this._render.bind(this);
     const handler = {
       set(target, property, value, receiver) {
-        evaluate();
-        return Reflect.set(...arguments);
+        Reflect.set(...arguments);
+        render();
+        return true;
       }
     };
     this._store = new Proxy(initialState, handler);
@@ -174,10 +174,16 @@ export class ProxyApp {
     return this.graph.rendered;
   }
 
-  render(element = { set innerHtml(html) {} }) {
-    // evaluate the dependency graph and render into the DOM
+  _render() {
     const evaluatedGraph = this.evaluate();
-    element.innerHtml = evaluatedGraph;
+    this._element.innerHTML = evaluatedGraph.trim();
+    return evaluatedGraph;
+  }
+
+  render(element = { set innerHtml(html) {} }) {
+    this._element = element;
+    // evaluate the dependency graph and render into the DOM
+    const evaluatedGraph = this._render();
     return evaluatedGraph;
   }
 }
