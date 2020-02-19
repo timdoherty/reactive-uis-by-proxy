@@ -101,44 +101,6 @@ describe("reactive UIs by proxy", () => {
             });
           });
         });
-
-        describe("and the model changes outside the component", () => {
-          it("reacts to the model change", () => {
-            const initialState = {
-              foo: "bar",
-              bar: "baz"
-            };
-
-            const store = new Proxy(initialState, {
-              set(target, property, value, receiver) {
-                // notify subsribers
-                evaluate({ property, value });
-                return true;
-              },
-              get(target, property, receiver) {
-                // how to know who's listening
-                return true;
-              }
-            });
-
-            class HasStore extends Component {
-              constructor({ store }) {
-                super();
-                this._store = store;
-              }
-              onChange() {
-                this._store.foo = "bim";
-              }
-              html() {
-                return `hello ${this._store.name}`;
-              }
-            }
-
-            // const hasStore = new HasStore({ store });
-            // hasStore.onChange();
-            // expect(evaluate).toHaveBeenCalledWith({
-          });
-        });
       });
     });
   });
