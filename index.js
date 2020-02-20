@@ -1,24 +1,48 @@
 export class Component {
   constructor() {
     this._dependencies = [];
+    this._events = [];
   }
 
   addDependency(dep) {
     this._dependencies.push(dep);
   }
 
-  _renderDependencies(renderedHtml) {
-    function componentReducer(html, component) {
-      let componentPatten = `<${component.constructor.name}(.*?)(\/>|>.*<\/${
-        component.constructor.name
-      }>)`;
-      let re = new RegExp(componentPatten, "gi");
-      html = html.replace(re, component.html());
-      return html;
+  _renderDependencies(fragment) {
+    for (let dep of this._dependencies) {
+      const element = dep.constructor.name;
+      for (let selectedElement of fragment.querySelectorAll(element)) {
+        selectedElement.parentNode.insertBefore(dep.rendered, selectedElement);
+        // selectedElement.insertAdjacentHTML('afterend', this._htmlString);
+        selectedElement.remove();
+      }
     }
-    const finalHtml = this._dependencies.reduce(componentReducer, renderedHtml);
-    return finalHtml;
+
+    // function componentReducer(html, component) {
+    //   let componentPatten = `<${component.constructor.name}(.*?)(\/>|>.*<\/${
+    //     component.constructor.name
+    //   }>)`;
+    //   let re = new RegExp(componentPatten, "gi");
+    //   html = html.replace(re, component.html());
+    //   return html;
+    // }
+    // const finalHtml = this._dependencies.reduce(componentReducer, renderedHtml);
+    // return finalHtml;
   }
+
+  addEventListener(event) {
+    this._events.push(event);
+  }
+
+  _registerEvents() {
+    for (let event of this._events) {
+      for (let eventTarget of this._rendered.querySelectorAll(event.selector)) {
+        eventTarget.addEventListener(event.type, event.handler);
+      }
+    }
+  }
+
+  // de-register event listeners on unmount?
 
   html() {
     return "";
@@ -26,9 +50,19 @@ export class Component {
 
   render() {
     let html = this.html().replace(/(\\r\\n|\\n|\\r|\\")/gm, "");
-    html = this._renderDependencies(html);
-    this._rendered = html;
-    return html;
+    // html = this._renderDependencies(html);
+    // return html;
+    const frag = window.document.createDocumentFragment(); //new DocumentFragment();
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    while (div.firstChild) {
+      frag.appendChild(div.firstChild);
+    }
+    // frag.appendChild(div);
+    this._renderDependencies(frag);
+    this._rendered = frag;
+    this._registerEvents();
+    return frag;
   }
 
   get dependencies() {
@@ -36,6 +70,9 @@ export class Component {
   }
 
   get rendered() {
+    if (!this._rendered) {
+      this._rendered = this.render();
+    }
     return this._rendered;
   }
 }
@@ -118,6 +155,7 @@ export class ComponentGraph {
     for (let comp of sorted.values()) {
       this._rendered = comp.render();
     }
+    return this._rendered;
   }
 
   get rendered() {
@@ -147,43 +185,38 @@ export class ComponentGraph {
 
 export class ProxyApp {
   constructor(RootNode, initialState = {}) {
-    const render = this._render.bind(this);
+    const evaluate = this.evaluate.bind(this);
     const handler = {
       set(target, property, value, receiver) {
         Reflect.set(...arguments);
-        render();
+        evaluate();
         return true;
       }
     };
     this._store = new Proxy(initialState, handler);
     const rootNode = new RootNode({ store: this._store });
     this.graph = new ComponentGraph(rootNode);
-    this.sort();
   }
 
   get store() {
     return this._store;
   }
 
-  sort() {
-    this.graph.sort();
-  }
-
   evaluate() {
-    this.graph.evaluate();
-    return this.graph.rendered;
-  }
-
-  _render() {
-    const evaluatedGraph = this.evaluate();
-    this._element.innerHTML = evaluatedGraph.trim();
+    const evaluatedGraph = this.graph.evaluate();
+    if (this._element.hasChildNodes()) {
+      this._element.replaceChild(evaluatedGraph, this._element.children[0]);
+    } else {
+      this._element.appendChild(evaluatedGraph);
+    }
+    // this._element.innerHTML = evaluatedGraph.trim();
     return evaluatedGraph;
   }
 
-  render(element = { set innerHtml(html) {} }) {
+  render(element = { hadChildNodes() {}, set innerHtml(html) {} }) {
     this._element = element;
     // evaluate the dependency graph and render into the DOM
-    const evaluatedGraph = this._render();
+    const evaluatedGraph = this.evaluate();
     return evaluatedGraph;
   }
 }
