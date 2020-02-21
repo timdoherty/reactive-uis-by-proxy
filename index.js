@@ -42,23 +42,30 @@ export class Component {
     }
   }
 
-  // de-register event listeners on unmount?
+  _deregisterEvents() {
+    for (let event of this._events) {
+      for (let eventTarget of this._rendered.querySelectorAll(event.selector)) {
+        eventTarget.removeEventListener(event.type, event.handler);
+      }
+    }
+  }
 
   html() {
     return "";
   }
 
   render() {
+    if (this._rendered) {
+      this._deregisterEvents();
+    }
     let html = this.html().replace(/(\\r\\n|\\n|\\r|\\")/gm, "");
-    // html = this._renderDependencies(html);
-    // return html;
+    // https://github.com/jsdom/jsdom/issues/2274
     const frag = window.document.createDocumentFragment(); //new DocumentFragment();
     const div = document.createElement("div");
     div.innerHTML = html;
     while (div.firstChild) {
       frag.appendChild(div.firstChild);
     }
-    // frag.appendChild(div);
     this._renderDependencies(frag);
     this._rendered = frag;
     this._registerEvents();
@@ -213,7 +220,9 @@ export class ProxyApp {
     return evaluatedGraph;
   }
 
-  render(element = { hadChildNodes() {}, set innerHtml(html) {} }) {
+  render(
+    element = { appendChild() {}, hasChildNodes() {}, set innerHtml(html) {} }
+  ) {
     this._element = element;
     // evaluate the dependency graph and render into the DOM
     const evaluatedGraph = this.evaluate();

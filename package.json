@@ -5,7 +5,8 @@
   "author": "Tim Doherty <tim.doherty@procore.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "nodemon http-server ."
+    "start": "nodemon -r esm http-server .",
+    "test": "jest --watch"
   },
   "dependencies": {
     "jest": "^25.1.0"

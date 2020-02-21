@@ -41,7 +41,6 @@ describe("reactive UIs by proxy", () => {
           const div = document.createElement("div");
           div.innerHTML = `<div>foobar</div>`;
           frag.appendChild(div.firstChild);
-          console.log({ frag });
           expect(myComponent.render()).toEqual(frag);
         });
 
@@ -67,11 +66,9 @@ describe("reactive UIs by proxy", () => {
             const div = document.createElement("div");
             div.innerHTML = `<div><span>barbaz</span></div>`;
             frag.appendChild(div.firstChild);
-            console.log({ frag });
 
             const myComponent = new MyComponent();
             expect(myComponent.render()).toEqual(frag);
-            // expect(myComponent.render()).toBe("<div><span>barbaz</span></div>");
           });
         });
       });
@@ -117,32 +114,48 @@ describe("reactive UIs by proxy", () => {
         });
       });
 
-      describe.only("when an event is triggered", () => {
-        it("responds to the event", () => {
-          const clicked = jest.fn();
-          class EventComponent extends Component {
-            constructor() {
-              super();
-              this.addEventListener({
-                selector: "button",
-                type: "click",
-                handler: this.onClick
-              });
-            }
-
-            onClick(e) {
-              clicked();
-            }
-
-            html() {
-              return `<button></button>`;
-            }
+      describe("when an event is registered", () => {
+        const clicked = jest.fn();
+        class EventComponent extends Component {
+          constructor() {
+            super();
+            this.addEventListener({
+              selector: "button",
+              type: "click",
+              handler: this.onClick
+            });
           }
 
-          const eventComponent = new EventComponent();
-          const frag = eventComponent.render();
-          frag.querySelector("button").dispatchEvent(new Event("click"));
-          expect(clicked).toHaveBeenCalled();
+          onClick(e) {
+            clicked();
+          }
+
+          html() {
+            return `<button></button>`;
+          }
+        }
+
+        describe("and the event is triggered", () => {
+          it("responds to the event", () => {
+            const eventComponent = new EventComponent();
+            const frag = eventComponent.render();
+            frag.querySelector("button").dispatchEvent(new Event("click"));
+            expect(clicked).toHaveBeenCalled();
+          });
+        });
+
+        describe("and the component re-renders", () => {
+          it("de-registers the event handler first", () => {
+            const spy = jest.spyOn(
+              EventComponent.prototype,
+              "_deregisterEvents"
+            );
+            const eventComponent = new EventComponent();
+            eventComponent.render();
+            // re-render to force cleanup
+            eventComponent.render();
+            expect(spy).toHaveBeenCalled();
+          });
         });
       });
     });
@@ -229,9 +242,13 @@ describe("reactive UIs by proxy", () => {
 
           const initialState = { name: "world" };
           const proxyApp = new ProxyApp(HasStore, initialState);
+          const frag = window.document.createDocumentFragment(); //new DocumentFragment();
+          const div = document.createElement("div");
+          div.innerHTML = "hello world";
+          frag.appendChild(div.firstChild);
           const result = proxyApp.render();
 
-          expect(result).toBe("hello world");
+          expect(result).toEqual(frag);
         });
       });
     });
