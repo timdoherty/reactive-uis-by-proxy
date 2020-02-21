@@ -264,8 +264,42 @@ describe("reactive UIs by proxy", () => {
         proxyApp.render();
 
         proxyApp.store.foo = "bim";
-        expect(evaluateSpy).toHaveBeenCalled();
+        expect(evaluateSpy).toHaveBeenCalledTimes(2);
         expect(proxyApp.store.foo).toBe("bim");
+      });
+    });
+  });
+
+  describe.only("when nested state changes", () => {
+    describe("and the nested state is an object", () => {
+      it("re-evaluates the graph", () => {
+        const initialState = {
+          foo: {
+            bar: "baz"
+          }
+        };
+        const evaluateSpy = jest.spyOn(ProxyApp.prototype, "evaluate");
+        const proxyApp = new ProxyApp(Foo, initialState);
+        proxyApp.render();
+
+        proxyApp.store.foo.bar = "bim";
+        expect(evaluateSpy).toHaveBeenCalledTimes(2);
+        expect(proxyApp.store.foo.bar).toBe("bim");
+      });
+    });
+
+    describe("and the nested state involves a collection", () => {
+      it("re-evaluates the graph", () => {
+        const initialState = {
+          foo: [1, 2, 3]
+        };
+        const evaluateSpy = jest.spyOn(ProxyApp.prototype, "evaluate");
+        const proxyApp = new ProxyApp(Foo, initialState);
+        proxyApp.render();
+
+        proxyApp.store.foo.push(4);
+        expect(evaluateSpy).toHaveBeenCalledTimes(2);
+        expect(proxyApp.store.foo).toEqual([1, 2, 3, 4]);
       });
     });
   });

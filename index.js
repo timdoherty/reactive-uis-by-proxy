@@ -50,6 +50,8 @@ export class Component {
     }
   }
 
+  // hmmm. what about unmount/cleanup on destroy?
+
   html() {
     return "";
   }
@@ -192,12 +194,41 @@ export class ComponentGraph {
 
 export class ProxyApp {
   constructor(RootNode, initialState = {}) {
+    const proxyCache = new WeakMap();
     const evaluate = this.evaluate.bind(this);
     const handler = {
       set(target, property, value, receiver) {
-        Reflect.set(...arguments);
+        Reflect.set(target, property, value, receiver);
         evaluate();
         return true;
+      },
+      get(target, property) {
+        const result = Reflect.get(target, property);
+        if (typeof result === "object") {
+          console.log(property, typeof result);
+          const proxy = new Proxy(result, handler);
+          console.log({ proxy });
+          proxyCache.set(result, proxy);
+        }
+        if (typeof result === "function") {
+          if (["push", "unshift"].includes(property)) {
+            return function(el) {
+              console.log("this is a array modification");
+              const output = Array.prototype[property].apply(target, arguments);
+              evaluate();
+              return output;
+            };
+          }
+          if (["pop"].includes(property)) {
+            return function() {
+              const el = Array.prototype[property].apply(target, arguments);
+              console.log("this is a array modification");
+              return el;
+            };
+          }
+          return result.bind(target);
+        }
+        return proxyCache.get(result) || result;
       }
     };
     this._store = new Proxy(initialState, handler);
