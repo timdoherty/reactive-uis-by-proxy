@@ -44,6 +44,28 @@ describe("reactive UIs by proxy", () => {
           expect(myComponent.render()).toEqual(frag);
         });
 
+        describe("and it has self-closing tags", () => {
+          it("closes the tag per HTML rules", () => {
+            class MyComponent extends Component {
+              constructor() {
+                super();
+                this.addDependency(new Foo());
+              }
+              html() {
+                return `<div><Foo /><span>bar</span</div>`;
+              }
+            }
+
+            const myComponent = new MyComponent();
+            const frag = window.document.createDocumentFragment(); //new DocumentFragment();
+            const div = document.createElement("div");
+            div.innerHTML = `<div><Foo></Foo><span>bar</span</div>`;
+            frag.appendChild(div.firstChild);
+            const actual = myComponent.render();
+            expect(actual).toEqual(frag);
+          });
+        });
+
         describe("and it has dependencies", () => {
           it("returns those too", () => {
             class Dep extends Component {
@@ -59,6 +81,12 @@ describe("reactive UIs by proxy", () => {
               html() {
                 return `<div><Dep /></div>`;
               }
+
+              renderDeps() {
+                for (const dep of this._dependencies) {
+                  dep.render();
+                }
+              }
             }
 
             // https://github.com/jsdom/jsdom/issues/2274
@@ -68,6 +96,7 @@ describe("reactive UIs by proxy", () => {
             frag.appendChild(div.firstChild);
 
             const myComponent = new MyComponent();
+            myComponent.renderDeps();
             expect(myComponent.render()).toEqual(frag);
           });
         });
@@ -270,7 +299,7 @@ describe("reactive UIs by proxy", () => {
     });
   });
 
-  describe.only("when nested state changes", () => {
+  describe("when nested state changes", () => {
     describe("and the nested state is an object", () => {
       it("re-evaluates the graph", () => {
         const initialState = {

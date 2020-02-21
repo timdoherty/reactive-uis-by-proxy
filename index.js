@@ -12,9 +12,14 @@ export class Component {
     for (let dep of this._dependencies) {
       const element = dep.constructor.name;
       for (let selectedElement of fragment.querySelectorAll(element)) {
-        selectedElement.parentNode.insertBefore(dep.rendered, selectedElement);
-        // selectedElement.insertAdjacentHTML('afterend', this._htmlString);
-        selectedElement.remove();
+        if (dep.rendered) {
+          selectedElement.parentNode.insertBefore(
+            dep.rendered,
+            selectedElement
+          );
+          // selectedElement.insertAdjacentHTML('afterend', this._htmlString);
+          selectedElement.remove();
+        }
       }
     }
 
@@ -50,6 +55,18 @@ export class Component {
     }
   }
 
+  _normalizeHtml(html) {
+    let normalized = html;
+    for (let dep of this._dependencies) {
+      const component = dep.constructor.name;
+      const componentPattern = `<${component}(.*?)(\/>)`;
+      const matcher = new RegExp(componentPattern, "gm");
+      normalized = normalized.replace(matcher, `<${component}></${component}>`);
+    }
+
+    return normalized;
+  }
+
   // hmmm. what about unmount/cleanup on destroy?
 
   html() {
@@ -61,6 +78,7 @@ export class Component {
       this._deregisterEvents();
     }
     let html = this.html().replace(/(\\r\\n|\\n|\\r|\\")/gm, "");
+    html = this._normalizeHtml(html);
     // https://github.com/jsdom/jsdom/issues/2274
     const frag = window.document.createDocumentFragment(); //new DocumentFragment();
     const div = document.createElement("div");
@@ -79,9 +97,9 @@ export class Component {
   }
 
   get rendered() {
-    if (!this._rendered) {
-      this._rendered = this.render();
-    }
+    // if (!this._rendered) {
+    //   this._rendered = this.render();
+    // }
     return this._rendered;
   }
 }
@@ -205,15 +223,12 @@ export class ProxyApp {
       get(target, property) {
         const result = Reflect.get(target, property);
         if (typeof result === "object") {
-          console.log(property, typeof result);
           const proxy = new Proxy(result, handler);
-          console.log({ proxy });
           proxyCache.set(result, proxy);
         }
         if (typeof result === "function") {
           if (["push", "unshift"].includes(property)) {
             return function(el) {
-              console.log("this is a array modification");
               const output = Array.prototype[property].apply(target, arguments);
               evaluate();
               return output;
@@ -222,7 +237,6 @@ export class ProxyApp {
           if (["pop"].includes(property)) {
             return function() {
               const el = Array.prototype[property].apply(target, arguments);
-              console.log("this is a array modification");
               return el;
             };
           }
