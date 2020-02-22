@@ -226,7 +226,15 @@ export class ProxyApp {
           const proxy = new Proxy(result, handler);
           proxyCache.set(result, proxy);
         }
+        // TODO test me!!
         if (typeof result === "function") {
+          if (["set", "get"].includes(property)) {
+            return function(el) {
+              const output = Map.prototype[property].apply(target, arguments);
+              evaluate();
+              return output;
+            };
+          }
           if (["push", "unshift"].includes(property)) {
             return function(el) {
               const output = Array.prototype[property].apply(target, arguments);
